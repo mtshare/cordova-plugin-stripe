@@ -1,7 +1,14 @@
 #import <Cordova/CDV.h>
+#import <Stripe/Stripe.h>
+
 @import Stripe;
 
 @interface CordovaStripe : CDVPlugin
+{
+    NSString *merchantId;
+    NSString *publishableKey;
+    NSString *callbackId;
+}
 @property (nonatomic, retain) STPAPIClient *client;
 
 - (void) setPublishableKey:(CDVInvokedUrlCommand *) command;

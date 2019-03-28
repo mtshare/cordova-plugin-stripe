@@ -5,6 +5,60 @@
 
 @synthesize client;
 
+
+- (void) pluginInitialize {
+    [super pluginInitialize];
+    
+#ifdef DEBUG
+    NSLog(@"Initialize Stripe Plugin");
+#endif
+    
+    publishableKey = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"StripePublishableKey"];
+    if ([publishableKey length]) {
+        [Stripe setDefaultPublishableKey:publishableKey];
+        [[STPPaymentConfiguration sharedConfiguration] setPublishableKey:publishableKey];
+    }
+    merchantId = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"ApplePayMerchant"];
+}
+
+
+
+/*
+ * Set Stripe Publishable Key via Javascript
+ */
+- (void)setStripePublishableKey:(CDVInvokedUrlCommand*)command
+{
+    publishableKey = [command.arguments objectAtIndex:0];
+    if ([publishableKey length]) {
+        [Stripe setDefaultPublishableKey:publishableKey];
+        [[STPPaymentConfiguration sharedConfiguration] setPublishableKey:publishableKey];
+    }
+    
+#ifdef DEBUG
+    NSLog(@"Setting Stripe publishable key %@", publishableKey);
+#endif
+}
+
+
+
+/**
+ * Set Apple merchant ID
+ */
+- (void)setMerchantId:(CDVInvokedUrlCommand*)command
+{
+    merchantId = [command.arguments objectAtIndex:0];
+    
+#ifdef DEBUG
+    NSLog(@"Setting merchant id to %@", merchantId);
+#endif
+}
+
+
+
+
+
+
+
 - (void)setPublishableKey:(CDVInvokedUrlCommand*)command
 {
     
@@ -20,9 +74,13 @@
     
     CDVPluginResult* result = [CDVPluginResult
                                resultWithStatus: CDVCommandStatus_OK];
-    [self.commandDelegate sendPluginResult:result callbackId:command.callbackId];
+    
+    [self.commandDelegate sendPluginResult:result
+                                callbackId:command.callbackId];
     
 }
+
+
 
 - (void)throwNotInitializedError:(CDVInvokedUrlCommand *) command
 {
@@ -30,16 +88,21 @@
     [self.commandDelegate sendPluginResult:result callbackId:command.callbackId];
 }
 
+
+
 - (void (^)(STPToken * _Nullable token, NSError * _Nullable error))handleTokenCallback: (CDVInvokedUrlCommand *) command
 {
     return ^(STPToken * _Nullable token, NSError * _Nullable error) {
         CDVPluginResult* result;
         if (error != nil) {
-            result = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString: error.localizedDescription];
+            result = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR
+                                       messageAsString:error.localizedDescription];
         } else {
-            result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary:token.allResponseFields];
+            result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
+                                   messageAsDictionary:token.allResponseFields];
         }
-        [self.commandDelegate sendPluginResult:result callbackId:command.callbackId];
+        [self.commandDelegate sendPluginResult:result
+                                    callbackId:command.callbackId];
     };
 }
 
@@ -53,33 +116,32 @@
     }
     
     [self.commandDelegate runInBackground:^{
-        
         NSDictionary* const cardInfo = [[command arguments] objectAtIndex:0];
         
         STPCardParams* cardParams = [[STPCardParams alloc] init];
         
         STPAddress* address = [[STPAddress alloc] init];
-        address.line1 = cardInfo[@"address_line1"];
-        address.line2 = cardInfo[@"address_line2"];
-        address.city = cardInfo[@"address_city"];
-        address.state = cardInfo[@"address_state"];
-        address.country = cardInfo[@"address_country"];
-        address.postalCode = cardInfo[@"postalCode"];
+        address.line1       = cardInfo[@"address_line1"];
+        address.line2       = cardInfo[@"address_line2"];
+        address.city        = cardInfo[@"address_city"];
+        address.state       = cardInfo[@"address_state"];
+        address.country     = cardInfo[@"address_country"];
+        address.postalCode  = cardInfo[@"postalCode"];
+        cardParams.address  = address;
         
-        cardParams.address = address;
-        
-        cardParams.number = cardInfo[@"number"];
+        cardParams.number   = cardInfo[@"number"];
         cardParams.expMonth = [cardInfo[@"expMonth"] intValue];
-        cardParams.expYear = [cardInfo[@"expYear"] intValue];
-        cardParams.cvc = cardInfo[@"cvc"];
-        cardParams.name = cardInfo[@"name"];
+        cardParams.expYear  = [cardInfo[@"expYear"] intValue];
+        cardParams.cvc      = cardInfo[@"cvc"];
+        cardParams.name     = cardInfo[@"name"];
         cardParams.currency = cardInfo[@"currency"];
         
-        [self.client createTokenWithCard:cardParams completion:[self handleTokenCallback:command]];
-        
+        [self.client createTokenWithCard:cardParams
+                              completion:[self handleTokenCallback:command]];
     }];
-    
 }
+
+
 
 - (void) createBankAccountToken:(CDVInvokedUrlCommand *)command
 {
@@ -87,18 +149,16 @@
         [self throwNotInitializedError:command];
         return;
     }
-
     
     [self.commandDelegate runInBackground:^{
-        
         NSDictionary* const bankAccountInfo = [command.arguments objectAtIndex:0];
         STPBankAccountParams* params = [[STPBankAccountParams alloc] init];
         
-        params.accountNumber = bankAccountInfo[@"account_number"];
-        params.country = bankAccountInfo[@"country"];
-        params.currency = bankAccountInfo[@"currency"];
-        params.routingNumber = bankAccountInfo[@"routing_number"];
-        params.accountHolderName = bankAccountInfo[@"account_holder_name"];
+        params.accountNumber =      bankAccountInfo[@"account_number"];
+        params.country =            bankAccountInfo[@"country"];
+        params.currency =           bankAccountInfo[@"currency"];
+        params.routingNumber =      bankAccountInfo[@"routing_number"];
+        params.accountHolderName =  bankAccountInfo[@"account_holder_name"];
         
         NSString* accountType = bankAccountInfo[@"account_holder_type"];
         if ([accountType  isEqualToString: @"individual"]) {
@@ -107,11 +167,12 @@
             params.accountHolderType = STPBankAccountHolderTypeCompany;
         }
         
-        [self.client createTokenWithBankAccount:params completion:[self handleTokenCallback:command]];
-        
+        [self.client createTokenWithBankAccount:params
+                                     completion:[self handleTokenCallback:command]];
     }];
     
 }
+
 
 - (void)validateCardNumber:(CDVInvokedUrlCommand *)command
 {
@@ -127,6 +188,7 @@
     CDVPluginResult *result = [CDVPluginResult resultWithStatus:status];
     [self.commandDelegate sendPluginResult:result callbackId:command.callbackId];
 }
+
 
 - (void)validateExpiryDate:(CDVInvokedUrlCommand *)command
 {
@@ -150,6 +212,7 @@
     [self.commandDelegate sendPluginResult:result callbackId:command.callbackId];
 }
 
+
 - (void)validateCVC:(CDVInvokedUrlCommand *)command
 {
     CDVCommandStatus status;
@@ -165,12 +228,17 @@
     [self.commandDelegate sendPluginResult:result callbackId:command.callbackId];
 }
 
+
 - (void)getCardType:(CDVInvokedUrlCommand *)command
 {
     STPCardBrand brand = [STPCardValidator brandForNumber:[command.arguments objectAtIndex:0]];
     NSArray *brands =  [[NSArray alloc] initWithObjects: @"Visa", @"American Express", @"MasterCard", @"Discover", @"JCB", @"Diners Club", @"Unknown", nil];
-    CDVPluginResult *result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:brands[brand]];
-    [self.commandDelegate sendPluginResult:result callbackId:command.callbackId];
+    
+    CDVPluginResult *result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
+                                                messageAsString:brands[brand]];
+    
+    [self.commandDelegate sendPluginResult:result
+                                callbackId:command.callbackId];
 }
 
 @end
